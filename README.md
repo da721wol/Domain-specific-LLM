@@ -1,4 +1,4 @@
-Note: This is the original README.md with close to no changes, except fine-tuning, since the orignal available scripts didn't work. Due to the high quality of the README.md no additional changes were required.
+Note: This is the original README.md with close to no changes, except fine-tuning, since the original available scripts didn't work. Due to the high quality of the README.md no additional changes were required.
 
 # Pretrain and Fine-tune a T5 model with Flax on GCP
 
