@@ -38,16 +38,16 @@ export CONFIG_TYPE="GermanT5/t5-efficient-gc4-german-base-nl36" # Config that ou
 export MODEL_PATH="data/${HF_PROJECT}" # Path to the model, e.g. here inside the mount
 
 # Create the tokenizer and the config
-#python3 create_tokenizer_cfg.py \
-#    --model_dir $MODEL_PATH \
-#    --dataset $DATASET_OSCAR \
-#    --dataset_config $DATASET_CONFIG_OSCAR \
-#    --dataset_split $DATASET_SPLIT \
-#    --text_field $TEXT_FIELD \
-#    --vocab_size $VOCAB_SIZE \
-#    --input_sentence_size $N_INPUT_SENTENCES \
-#    --config_type $CONFIG_TYPE\
-#    --cache_dir $HF_DATASETS_CACHE
+python3 create_tokenizer_cfg.py \
+    --model_dir $MODEL_PATH \
+    --dataset $DATASET_OSCAR \
+    --dataset_config $DATASET_CONFIG_OSCAR \
+    --dataset_split $DATASET_SPLIT \
+    --text_field $TEXT_FIELD \
+    --vocab_size $VOCAB_SIZE \
+    --input_sentence_size $N_INPUT_SENTENCES \
+    --config_type $CONFIG_TYPE\
+    --cache_dir $HF_DATASETS_CACHE
 
 # Pretraining
 python3 run_t5_mlm_flax.py \
@@ -75,9 +75,11 @@ python3 run_t5_mlm_flax.py \
     --num_train_epochs=10
 
 # Setup For Finetuning
-#pip install -r requirements_finetuning.txt
+pip install -r requirements_finetuning.txt
 
 # Finetuning on German Quad
-#python3 finetune_t5_quad.py
-#python3 finetune_t5_classification.py
-#python3 finetune_t5_summarization.py
+python3 finetune_t5_quad_closed_book.py --model_path='data/t5-german' --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir='dwolpers/german_T5_Large_Quad'
+python3 finetune_t5_quad2_closed_book.py --model_path='dwolpers/german_T5_Large_Quad' --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir='dwolpers/german_T5_Large_Closed'
+python3 finetune_t5_quad_open_book.py --model_path='dwolpers/german_T5_Large_Quad' --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir='dwolpers/german_T5_Large_Open'
+python3 finetune_t5_classification.py  --model_path='dwolpers/german_T5_Large_Closed' --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir='dwolpers/german_T5_Large_Closed_Class'
+python3 finetune_t5_classification.py  --model_path='dwolpers/german_T5_Large_Open' --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir='dwolpers/german_T5_Large_Open_Class'

@@ -9,12 +9,22 @@ import numpy as np
 from transformers import AutoTokenizer, DataCollatorForSeq2Seq
 from transformers import T5ForConditionalGeneration, Seq2SeqTrainingArguments, Seq2SeqTrainer
 
+
+parser=argparse.ArgumentParser(description="Training argument parser")
+parser.add_argument("--model_path")
+parser.add_argument("--num_train_epochs", default=6)
+parser.add_argument("--batch_size", default=8)
+parser.add_argument("--push_to_hub", default=True)
+parser.add_argument("--output_dir")
+arguments=parser.parse_args()
+
+
 # Load and split the dataset
 dataset = load_dataset("deepset/germanquad")
 
 # Load the tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained("data/t5-german")
-model = T5ForConditionalGeneration.from_pretrained("data/t5-german", from_flax=True)
+tokenizer = AutoTokenizer.from_pretrained(arguments.model_path)
+model = T5ForConditionalGeneration.from_pretrained(arguments.model_path, from_flax=True)
 
 # Load the data collatorFor
 data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
@@ -56,19 +66,18 @@ def compute_metrics(eval_preds):
 
 # Set up training arguments
 training_args = Seq2SeqTrainingArguments(
-  output_dir="dwolpers/german_T5_Large_Quad",
+  output_dir=arguments.output_dir,
   evaluation_strategy="epoch",
   learning_rate=3e-4,
-  per_device_train_batch_size=8,
-  per_device_eval_batch_size=8,
+  per_device_train_batch_size=arguments.batch_size,
+  per_device_eval_batch_size=arguments.batch_size,
   weight_decay=0.01,
   save_total_limit=3,
-  num_train_epochs=6,
+  num_train_epochs=arguments.num_train_epochs,
   predict_with_generate=True,
-  push_to_hub=True,
+  push_to_hub=arguments.push_to_hub,
   report_to=["none"],
   use_cpu=True,
-  use_ipex=True,
   generation_max_length=100
 )
 
