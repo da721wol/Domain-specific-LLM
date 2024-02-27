@@ -1,8 +1,10 @@
+Note: This is the original README.md with close to no changes, except fine-tuning, since the orignal available scripts didn't work. Due to the high quality of the README.md no additional changes were required.
+
 # Pretrain and Fine-tune a T5 model with Flax on GCP
 
 This tutorial details how pretrain and fine-tune a [FlaxT5](https://github.com/huggingface/transformers/blob/master/src/transformers/models/t5/modeling_flax_t5.py) model from HuggingFace using a TPU VM available on Google Cloud.
 
-While the code is only slightly adapted from the original HuggingFace examples for [pretraining](https://github.com/huggingface/transformers/tree/master/examples/flax/language-modeling#t5-like-span-masked-language-modeling) and [seq2seq fine-tuning](https://github.com/huggingface/transformers/tree/master/examples/flax/summarization), this repository is aimed to provide a comprehensive overview for the whole process, with a special focus on **pitfalls** due to an incorrect environment setup.
+While the code is only slightly adapted from the original HuggingFace examples for [pretraining](https://github.com/huggingface/transformers/tree/master/examples/flax/language-modeling#t5-like-span-masked-language-modeling), this repository is aimed to provide a comprehensive overview for the whole process, with a special focus on **pitfalls** due to an incorrect environment setup.
 
 _**Why JAX/Flax?**_ Thanks to the amazing work of the HuggingFace team, a good portion of the models available in the `transformers` library are available in [Flax](https://flax.readthedocs.io/en/latest/index.html), a neural network library built on top of [JAX](https://jax.readthedocs.io/en/latest/index.html). Using Flax for pretraining on TPUs is especially convenient for two reasons:
 
@@ -184,9 +186,17 @@ git commit -m "Added TF and PT models"
 git push
 ```
 
-## Fine-tune a pretrained T5 model in Flax
+## Fine-tune a pretrained T5 model
 
-Refer to [`gsarti/it5`](https://github.com/gsarti/it5) for scripts used to fine-tune T5 models after pre-training
+Fine-tuning the pretrained models can be done with the available `finetune_t5_<dataset>_<task>.py` scripts for different fine-tuning tasks. Adapting these scripts for new tasks and/or other datasets is easily possible, only the selected columns in "preprocess_function" might change.  
+
+```shell
+python3 finetune_t5_quad_closed_book.py --model_path=$MODEL_PATH --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir=$MODEL_PATH
+python3 finetune_t5_quad2_closed_book.py --model_path=$MODEL_PATH --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir=$MODEL_PATH
+python3 finetune_t5_quad_open_book.py --model_path=$MODEL_PATH --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir=$MODEL_PATH
+python3 finetune_t5_classification.py  --model_path=$MODEL_PATH --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir=$MODEL_PATH
+```
+
 
 ## Useful Tips
 
