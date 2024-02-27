@@ -196,7 +196,9 @@ python3 finetune_t5_quad2_closed_book.py --model_path=$MODEL_PATH --num_train_ep
 python3 finetune_t5_quad_open_book.py --model_path=$MODEL_PATH --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir=$MODEL_PATH
 python3 finetune_t5_classification.py  --model_path=$MODEL_PATH --num_train_epochs=3 --batch_size=8 --push_to_hub=False --output_dir=$MODEL_PATH
 ```
+## Evaluation of a T5 model
 
+Just like fine-tuning the available `evaluate_<dataset>_<task>.py` scripts can be used to evaluate models for different tasks with a ROUGE-score. All models have to be added to the scripts manually.
 
 ## Useful Tips
 
