@@ -26,13 +26,14 @@ import logging
 import os
 import sys
 import time
+import copy
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import numpy as np
-from datasets import load_dataset
+from datasets import concatenate_datasets, load_dataset, Value
 from tqdm import tqdm
 
 import flax
@@ -54,8 +55,9 @@ from transformers import (
     T5Config,
     TrainingArguments,
     is_tensorboard_available,
-    set_seed,
+    set_seed
 )
+from datasets import DatasetDict
 from transformers.models.t5.modeling_flax_t5 import shift_tokens_right
 
 logger = logging.getLogger(__name__)
@@ -74,7 +76,7 @@ class ModelArguments:
         default=None,
         metadata={
             "help": "The model checkpoint for weights initialization."
-            "Don't set if you want to train a model from scratch."
+                    "Don't set if you want to train a model from scratch."
         },
     )
     model_type: Optional[str] = field(
@@ -115,10 +117,16 @@ class DataTrainingArguments:
     """
 
     dataset_name: Optional[str] = field(
-        default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
+        default=None, metadata={"help": "The name of the datasets to use (via the datasets library)."}
+    )
+    dataset_name2: Optional[str] = field(
+        default=None, metadata={"help": "The name of the datasets to use (via the datasets library)."}
     )
     dataset_config_name: Optional[str] = field(
-        default=None, metadata={"help": "The configuration name of the dataset to use (via the datasets library)."}
+        default=None, metadata={"help": "The configuration name of the datasets to use (via the datasets library)."}
+    )
+    dataset_config_name2: Optional[str] = field(
+        default=None, metadata={"help": "The configuration name of the datasets to use (via the datasets library)."}
     )
     train_file: Optional[str] = field(default=None, metadata={"help": "The input training data file (a text file)."})
     validation_file: Optional[str] = field(
@@ -411,6 +419,7 @@ def save_checkpoint(model, save_dir, state, cur_step: int, with_opt: bool = True
         with open(os.path.join(save_dir, "training_state.json"), "w") as f:
             json.dump({"step": state.step.item()}, f)
     logger.info(f'Saving model in {save_dir} {"and pushing it to HF Hub" if push_to_hub else ""}')
+    print('saving model', save_dir)
     model.save_pretrained(
         save_dir,
         params=state.params,
@@ -477,46 +486,83 @@ if __name__ == "__main__":
     #
     # For CSV/JSON files, this script will use the column called 'text' or the first column if no column called
     # 'text' is found. You can easily tweak this behavior (see below).
-    if data_args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        datasets = load_dataset(data_args.dataset_name, data_args.dataset_config_name, cache_dir=model_args.cache_dir)
+    datasets = None
+    dataset_huggingface = {}
+    dataset_file = {}
 
-        if "validation" not in datasets.keys():
-            datasets["validation"] = load_dataset(
-                data_args.dataset_name,
-                data_args.dataset_config_name,
+    def loadDataset(dataset_name, config_name, datasets):
+        dataset_huggingface = load_dataset(dataset_name, config_name, cache_dir=model_args.cache_dir)
+
+        if "validation" not in dataset_huggingface.keys():
+            dataset_huggingface["validation"] = load_dataset(
+                dataset_name,
+                config_name,
                 split=f"train[:{data_args.validation_split_count}]",
                 cache_dir=model_args.cache_dir,
             )
-            datasets["train"] = load_dataset(
-                data_args.dataset_name,
-                data_args.dataset_config_name,
+            dataset_huggingface["train"] = load_dataset(
+                dataset_name,
+                config_name,
                 split=f"train[{data_args.validation_split_count}:]",
                 cache_dir=model_args.cache_dir,
             )
         else:
-            datasets["validation"] = load_dataset(
-                data_args.dataset_name,
-                data_args.dataset_config_name,
+            dataset_huggingface["validation"] = load_dataset(
+                dataset_name,
+                config_name,
                 split=f"validation[:{data_args.validation_split_count}]",
                 cache_dir=model_args.cache_dir,
             )
-            datasets["train"] = load_dataset(
-                data_args.dataset_name,
-                data_args.dataset_config_name,
+            dataset_huggingface["train"] = load_dataset(
+                dataset_name,
+                config_name,
                 split="train",
                 cache_dir=model_args.cache_dir,
             )
-    else:
-        data_files = {}
-        if data_args.train_file is not None:
-            data_files["train"] = data_args.train_file
+        if isinstance(dataset_huggingface["train"]["id"][0], str):
+            dataset_huggingface["train"] = dataset_huggingface["train"].cast_column("id", Value("int64"))
+            dataset_huggingface["validation"] = dataset_huggingface["validation"].cast_column("id", Value("int64"))
+        if datasets is None:
+            datasets = dataset_huggingface
+        else:
+            datasets["train"] = concatenate_datasets([datasets["train"], dataset_huggingface["train"]])
+            datasets["validation"] = concatenate_datasets([datasets["validation"], dataset_huggingface["validation"]])
+        return datasets
+
+    if data_args.dataset_name is not None:
+        dataset_name = data_args.dataset_name
+        config_name = data_args.dataset_config_name
+        datasets = loadDataset(dataset_name, config_name, datasets)
+
+    if data_args.dataset_name2 is not None:
+        dataset_name = data_args.dataset_name2
+        config_name = data_args.dataset_config_name2
+        datasets = loadDataset(dataset_name, config_name, datasets)
+
+    if data_args.train_file is not None:
+        data_files = {"train": data_args.train_file}
         if data_args.validation_file is not None:
             data_files["validation"] = data_args.validation_file
         extension = data_args.train_file.split(".")[-1]
         if extension == "txt":
             extension = "text"
-        datasets = load_dataset(extension, data_files=data_files, cache_dir=model_args.cache_dir)
+        if extension == "jsonl":
+            extension = "json"
+        dataset_file = load_dataset(extension, data_files=data_files, cache_dir=model_args.cache_dir)
+    train_testvalid = dataset_file["train"].train_test_split(0.1)
+    # Split the 10% test + valid in half test, half valid
+    test_valid = train_testvalid['test'].train_test_split(0.5)
+    # gather everyone if you want to have a single DatasetDict
+    dataset_file = DatasetDict({
+        'train': train_testvalid['train'],
+        'test': test_valid['test'],
+        'validation': test_valid['train']})
+
+    datasets =copy.deepcopy(dataset_file)
+    for i in range(99):
+        datasets["train"] = concatenate_datasets([datasets["train"], dataset_file["train"]])
+        datasets["test"] = concatenate_datasets([datasets["test"], dataset_file["test"]])
+        datasets["validation"] = concatenate_datasets([datasets["validation"], dataset_file["validation"]])
 
     # See more about loading any type of standard or custom dataset (from files, python dict, pandas DataFrame, etc) at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
@@ -525,15 +571,15 @@ if __name__ == "__main__":
 
     if model_args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(
-            model_args.tokenizer_name, 
-            cache_dir=model_args.cache_dir, 
+            model_args.tokenizer_name,
+            cache_dir=model_args.cache_dir,
             use_fast=model_args.use_fast_tokenizer,
             use_auth_token=model_args.auth_token
         )
     elif model_args.model_name_or_path:
         tokenizer = AutoTokenizer.from_pretrained(
-            model_args.model_name_or_path, 
-            cache_dir=model_args.cache_dir, 
+            model_args.model_name_or_path,
+            cache_dir=model_args.cache_dir,
             use_fast=model_args.use_fast_tokenizer,
             use_auth_token=model_args.auth_token
         )
@@ -642,7 +688,7 @@ if __name__ == "__main__":
 
     if model_args.model_name_or_path:
         model = FlaxT5ForConditionalGeneration.from_pretrained(
-            model_args.model_name_or_path, config=config, seed=training_args.seed, dtype=getattr(jnp, model_args.dtype)
+            model_args.model_name_or_path, seed=training_args.seed, dtype=getattr(jnp, model_args.dtype)
         )
     else:
         model = FlaxT5ForConditionalGeneration(config, seed=training_args.seed, dtype=getattr(jnp, model_args.dtype))
@@ -875,15 +921,15 @@ if __name__ == "__main__":
                         state,
                         cur_step,
                         with_opt=True,
-                        push_to_hub=True
+                        push_to_hub=False
                     )
-    
+
     if jax.process_index() == 0:
-        save_checkpoint(model, training_args.output_dir, state, cur_step, with_opt=False, push_to_hub=True)
-                    #params = jax.device_get(jax.tree_map(lambda x: x[0], state.params))
-                    #model.save_pretrained(
-                    #    training_args.output_dir,
-                    #    params=params,
-                    #    push_to_hub=training_args.push_to_hub,
-                    #    commit_message=f"Saving weights and logs of step {cur_step}",
-                    #)
+        save_checkpoint(model, training_args.output_dir, state, cur_step, with_opt=False, push_to_hub=False)
+        #params = jax.device_get(jax.tree_map(lambda x: x[0], state.params))
+        #model.save_pretrained(
+        #    training_args.output_dir,
+        #    params=params,
+        #    push_to_hub=training_args.push_to_hub,
+        #    commit_message=f"Saving weights and logs of step {cur_step}",
+        #)

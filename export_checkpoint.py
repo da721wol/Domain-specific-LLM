@@ -1,13 +1,6 @@
 import argparse
-from transformers import T5ForConditionalGeneration, TFT5ForConditionalGeneration
-
-def main(args):
-    pt_model = T5ForConditionalGeneration.from_pretrained(args.model_dir, from_flax=True)
-    pt_model.save_pretrained(args.model_dir)
-    tf_model = TFT5ForConditionalGeneration.from_pretrained(args.model_dir, from_pt=True)
-    tf_model.save_pretrained(args.model_dir)
+from transformers import FlaxT5ForConditionalGeneration
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--model_dir', type=str, default='.')
+tf_model = FlaxT5ForConditionalGeneration.from_pretrained("t5-efficient-gc4-german-base-nl36", from_pt=True)
+tf_model.save_pretrained("data/t5-german")

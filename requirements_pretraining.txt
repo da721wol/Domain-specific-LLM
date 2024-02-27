@@ -1,0 +1,8 @@
+datasets
+transformers
+flax
+optax==0.1.7
+torch
+evaluate
+tensorboard
+accelerate

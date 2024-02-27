@@ -80,7 +80,7 @@ python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
 pip install "jax[tpu]>=0.2.16" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
-pip install -r requirements.txt
+pip install -r requirements_pretraining.txt
 sudo apt-get install git-lfs
 git lfs install
 ```
