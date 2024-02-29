@@ -690,6 +690,7 @@ if __name__ == "__main__":
         model = FlaxT5ForConditionalGeneration.from_pretrained(
             model_args.model_name_or_path, seed=training_args.seed, dtype=getattr(jnp, model_args.dtype)
         )
+        model.params = model.to_bf16(model.params)
     else:
         model = FlaxT5ForConditionalGeneration(config, seed=training_args.seed, dtype=getattr(jnp, model_args.dtype))
 
